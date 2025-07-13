@@ -37,10 +37,7 @@ from typing import List
 
 app = FastAPI()
 
-# … the rest of your code stays exactly the same …
 
-
-app = FastAPI()
 
 # Use the current working directory as the home directory.
 HOME_DIR = os.getcwd()
