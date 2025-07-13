@@ -1,3 +1,16 @@
+import os
+import imageio_ffmpeg as _ffmpeg
+
+# 1) get the full path to the bundled ffmpeg binary
+_ffmpeg_path = _ffmpeg.get_ffmpeg_exe()
+
+# 2) prepend its folder to PATH so subprocess.run(["ffmpeg", …]) will find it
+_ffmpeg_dir = os.path.dirname(_ffmpeg_path)
+os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+
+# (optional) if your libraries read FFMPEG_BINARY or FFMPEG_PATH:
+os.environ["FFMPEG_BINARY"] = _ffmpeg_path
+os.environ["FFMPEG_PATH"]   = _ffmpeg_path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
