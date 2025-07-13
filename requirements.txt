@@ -1,5 +1,6 @@
 fastapi
 ffmpeg-python
+pydub
 imageio-ffmpeg
 librosa
 spleeter
