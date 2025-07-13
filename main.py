@@ -7,13 +7,7 @@ import logging
 from typing import List
 
 app = FastAPI()
-#from fastapi.middleware.cors import CORSMiddleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # For development only
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 # Use the current working directory as the home directory.
 HOME_DIR = os.getcwd()
 
