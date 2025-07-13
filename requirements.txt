@@ -1,8 +1,8 @@
-fastapi
-librosa
-ffmpeg-python
-spleeter
-tensorflow
+fastapi==0.116.1
+librosa==0.11.0
+ffmpeg-python==0.2.0
+spleeter==2.1.0
+tensorflow==2.16.1
 numba
 llvmlite
 protobuf==3.20.2
