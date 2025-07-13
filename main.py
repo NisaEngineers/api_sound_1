@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,6 +6,21 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
 from typing import List
+
+# ← INSERT THESE LINES BELOW ←
+
+import imageio_ffmpeg as _ffmpeg
+from pydub import AudioSegment
+
+# tell pydub to use the static ffmpeg binary bundled with imageio-ffmpeg
+AudioSegment.converter = _ffmpeg.get_ffmpeg_exe()
+
+# ← end of insertion ←
+
+app = FastAPI()
+
+# … the rest of your code stays exactly the same …
+
 
 app = FastAPI()
 
