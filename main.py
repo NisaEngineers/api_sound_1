@@ -1,16 +1,28 @@
 import os
 import imageio_ffmpeg as _ffmpeg
+import logging
+from pydub import AudioSegment
 
-# 1) get the full path to the bundled ffmpeg binary
-_ffmpeg_path = _ffmpeg.get_ffmpeg_exe()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# 2) prepend its folder to PATH so subprocess.run(["ffmpeg", …]) will find it
-_ffmpeg_dir = os.path.dirname(_ffmpeg_path)
-os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+# Attempt to use bundled ffmpeg, fall back to system ffmpeg if unavailable
+try:
+    _ffmpeg_path = _ffmpeg.get_ffmpeg_exe()
+    if os.path.exists(_ffmpeg_path):
+        _ffmpeg_dir = os.path.dirname(_ffmpeg_path)
+        os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+        os.environ["FFMPEG_BINARY"] = _ffmpeg_path
+        os.environ["FFMPEG_PATH"] = _ffmpeg_path
+        AudioSegment.converter = _ffmpeg_path
+        logger.info(f"Using bundled ffmpeg from imageio-ffmpeg at: {_ffmpeg_path}")
+    else:
+        logger.warning("Bundled ffmpeg not found, relying on system ffmpeg")
+except Exception as e:
+    logger.warning(f"Error accessing bundled ffmpeg: {e}, relying on system ffmpeg")
 
-# (optional) if your libraries read FFMPEG_BINARY or FFMPEG_PATH:
-os.environ["FFMPEG_BINARY"] = _ffmpeg_path
-os.environ["FFMPEG_PATH"]   = _ffmpeg_path
+# Rest of your code...
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
@@ -20,13 +32,6 @@ import os
 import logging
 from typing import List
 
-# ← INSERT THESE LINES BELOW ←
-
-import imageio_ffmpeg as _ffmpeg
-from pydub import AudioSegment
-
-# tell pydub to use the static ffmpeg binary bundled with imageio-ffmpeg
-AudioSegment.converter = _ffmpeg.get_ffmpeg_exe()
 
 # ← end of insertion ←
 
