@@ -1,6 +1,7 @@
 fastapi
-librosa
 ffmpeg-python
+imageio-ffmpeg
+librosa
 spleeter
 tensorflow
 numba
