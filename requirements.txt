@@ -1,1 +1,9 @@
-
+fastapi
+librosa
+ffmpeg-python
+spleeter
+tensorflow
+numba
+llvmlite
+protobuf==3.20.2
+numpy==1.26.4
