@@ -8,6 +8,7 @@ spleeter
 tensorflow
 numba
 llvmlite
+uvicorn
 python-multipart
 protobuf==3.20.2
 numpy==1.26.4
