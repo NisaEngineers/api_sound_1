@@ -5,6 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
 from typing import List
+import os
+from imageio_ffmpeg import get_ffmpeg_exe
+
+# Point all FFmpeg calls to the bundled static binary
+exe = get_ffmpeg_exe()
+os.environ["FFMPEG_PATH"] = exe
+os.environ["IMAGEIO_FFMPEG_EXE"] = exe
 
 app = FastAPI()
 #from fastapi.middleware.cors import CORSMiddleware
