@@ -1,5 +1,6 @@
 fastapi
 ffmpeg-python
+static-ffmpeg
 pydub
 imageio-ffmpeg
 librosa
