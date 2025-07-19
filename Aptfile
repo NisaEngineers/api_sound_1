@@ -5,3 +5,4 @@ libx265-199
 libopus0
 libvorbis0a
 libpulse0
+libpulse-mainloop-glib0
