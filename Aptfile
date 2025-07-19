@@ -6,3 +6,4 @@ libopus0
 libvorbis0a
 libpulse0
 libpulse-mainloop-glib0
+pulseaudio-utils
