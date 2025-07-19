@@ -1,29 +1,3 @@
-import os
-import imageio_ffmpeg as _ffmpeg
-import logging
-from pydub import AudioSegment
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Attempt to use bundled ffmpeg, fall back to system ffmpeg if unavailable
-try:
-    _ffmpeg_path = _ffmpeg.get_ffmpeg_exe()
-    if os.path.exists(_ffmpeg_path):
-        _ffmpeg_dir = os.path.dirname(_ffmpeg_path)
-        os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-        os.environ["FFMPEG_BINARY"] = _ffmpeg_path
-        os.environ["FFMPEG_PATH"] = _ffmpeg_path
-        AudioSegment.converter = _ffmpeg_path
-        logger.info(f"Using bundled ffmpeg from imageio-ffmpeg at: {_ffmpeg_path}")
-    else:
-        logger.warning("Bundled ffmpeg not found, relying on system ffmpeg")
-except Exception as e:
-    logger.warning(f"Error accessing bundled ffmpeg: {e}, relying on system ffmpeg")
-
-# Rest of your code...
-
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,13 +6,14 @@ import os
 import logging
 from typing import List
 
-
-# ← end of insertion ←
-
 app = FastAPI()
-
-
-
+#from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For development only
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Use the current working directory as the home directory.
 HOME_DIR = os.getcwd()
 
