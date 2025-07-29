@@ -1,22 +1,11 @@
-# Web framework
 fastapi
 uvicorn[standard]
-
-# File uploads
 python-multipart
-
-# Audio processing
 pydub
 librosa
 spleeter
 ffmpeg-python
-imageio-ffmpeg
 
-# ML / Dependencies
-tensorflow
-numpy==1.18.5
-protobuf==3.20.*
 
-# Ngrok tunnel + asyncio patch
-nest-asyncio
-pyngrok
+
+
