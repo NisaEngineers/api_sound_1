@@ -15,7 +15,8 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
     rm -rf /root/.cache/pip
-
+# ✅ full stable version
+RUN pip install tensorflow==2.15.0
 # Clean up build artifacts
 RUN find /usr/local -depth \
     \( \
