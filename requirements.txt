@@ -4,7 +4,7 @@ fastapi
 uvicorn
 python-multipart
 librosa
-numpy==1.26.4
+numpy==1.23.5
 soundfile==0.12.1
 
 
