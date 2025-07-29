@@ -1,10 +1,9 @@
+spleeter
 fastapi==0.110.0
 uvicorn==0.29.0
 python-multipart==0.0.9
 librosa==0.10.1
-torch==2.2.1
-torchaudio==2.2.1
 numpy==1.26.4
 soundfile==0.12.1
-tensorflow-cpu
-spleeter
+
+
