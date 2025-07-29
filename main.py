@@ -5,6 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
 from typing import List
+# Add at the top of your file
+import pathlib
+
+# Replace HOME_DIR definition with:
+
 
 app = FastAPI()
 #from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Use the current working directory as the home directory.
-HOME_DIR = os.getcwd()
+HOME_DIR = str(pathlib.Path(__file__).parent.resolve())
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
