@@ -2,6 +2,6 @@ fastapi==0.110.0
 uvicorn==0.29.0
 python-multipart==0.0.9
 librosa==0.10.1
-torch=2.2.1
+torch==2.2.1
 torchaudio
 soundfile
