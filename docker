@@ -1,20 +1,35 @@
-# Use Python base image
 FROM python:3.9.21-slim
 
-# Install FFmpeg and other dependencies
-RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
+# Install dependencies for ffmpeg and TensorFlow
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    build-essential \
+    git \
+    curl \
+    libfreetype6-dev \
+    libpng-dev \
+    libzmq3-dev \
+    liblapack-dev \
+    libblas-dev \
+    libhdf5-dev \
+    libx11-dev \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    && apt-get clean
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
+# Copy source files
 COPY . .
 
-# Expose FastAPI on port 8000
+# Expose FastAPI port
 EXPOSE 8000
 
 # Run FastAPI
