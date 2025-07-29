@@ -1,6 +1,6 @@
 from spleeter.separator import Separator
 import os
-import tensorflow
+
 class VocalRemover:
     def __init__(self, input_path, task='spleeter:2stems'):
         self.input_path = input_path
