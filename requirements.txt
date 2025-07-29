@@ -3,7 +3,6 @@ fastapi
 uvicorn
 python-multipart
 librosa
-tensorflow
 numpy==1.26.4
 soundfile==0.12.1
 
