@@ -6,5 +6,5 @@ torch==2.2.1
 torchaudio==2.2.1
 numpy==1.26.4
 soundfile==0.12.1
-tensorflow-cpu==2.15.0
-spleeter==2.4.0
+tensorflow-cpu
+spleeter
