@@ -2,9 +2,9 @@ fastapi==0.110.0
 uvicorn==0.29.0
 python-multipart==0.0.9
 librosa==0.10.1
-torch
-torchaudio
-numpy==1.26.4  # Critical: Pin to last 1.x version
+torch==2.2.1
+torchaudio==2.2.1
+numpy==1.26.4
 soundfile==0.12.1
-tensorflow-cpu==2.15.0  # Use CPU-only TensorFlow
-spleeter==2.4.0  # Explicitly add spleeter
+tensorflow-cpu==2.15.0
+spleeter==2.4.0
