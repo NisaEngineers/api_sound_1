@@ -1,11 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import os
 import logging
 import pathlib
-from typing import List
 
 app = FastAPI()
 
@@ -17,82 +16,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Use the current working directory as the base home directory
+# Set the working directory
 HOME_DIR = str(pathlib.Path(__file__).parent.resolve())
 
-# Configure logging
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def ensure_directory_exists(directory: str):
-    """Create a directory if it does not exist."""
     os.makedirs(directory, exist_ok=True)
 
 def normalize_path(path: str) -> str:
-    """Normalize file paths to use forward slashes."""
     return path.replace("\\", "/")
 
-def process_audio(file_path: str, task: str) -> List[str]:
-    os.chdir(HOME_DIR)
+def perform_vocal_removal(file_path: str) -> list:
     file_basename = os.path.splitext(os.path.basename(file_path))[0]
+    output_dir = os.path.join(HOME_DIR, "vocal_remover")
+    ensure_directory_exists(output_dir)
+    
+    # Change to output dir before running
+    os.chdir(output_dir)
 
-    if task == "Vocal Remove":
-        target_dir = os.path.join(HOME_DIR, "vocal_remover")
-        ensure_directory_exists(target_dir)
-        os.chdir(target_dir)
+    from moonarch_vocal_remover import VocalRemover
+    VocalRemover(file_path).run()
 
-        from moonarch_vocal_remover import VocalRemover
-        VocalRemover(file_path).run()
-        os.chdir(HOME_DIR)
-
-        return [
-            normalize_path(os.path.join("vocal_remover", file_basename, "vocals.wav")),
-            normalize_path(os.path.join("vocal_remover", file_basename, "accompaniment.wav"))
-        ]
-
-    elif task == "Basic Split":
-        # 1. Basic split
-        basic_dir = os.path.join(HOME_DIR, "basic_splits")
-        ensure_directory_exists(basic_dir)
-        os.chdir(basic_dir)
-
-        from moonarch_basic import BasicSplitter
-        BasicSplitter(file_path).run()
-        os.chdir(HOME_DIR)
-
-        # 2. Vocal remover
-        vocal_dir = os.path.join(HOME_DIR, "vocal_remover")
-        ensure_directory_exists(vocal_dir)
-        os.chdir(vocal_dir)
-
-        from moonarch_vocal_remover import VocalRemover
-        VocalRemover(file_path).run()
-        os.chdir(HOME_DIR)
-
-        return [
-            normalize_path(os.path.join("vocal_remover", file_basename, "vocals.wav")),
-            normalize_path(os.path.join("basic_splits", file_basename, "other.wav")),
-            normalize_path(os.path.join("basic_splits", file_basename, "bass.wav")),
-            normalize_path(os.path.join("basic_splits", file_basename, "drums.wav")),
-        ]
-
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported task")
+    # Return relative output paths
+    return [
+        normalize_path(os.path.join("vocal_remover", file_basename, "vocals.wav")),
+        normalize_path(os.path.join("vocal_remover", file_basename, "accompaniment.wav")),
+    ]
 
 @app.post("/process-audio/")
-async def process_audio_endpoint(task: str = Form(...), audio_file: UploadFile = File(...)):
+async def process_audio(audio_file: UploadFile = File(...)):
     """
-    Accepts an uploaded audio file and a processing task.
-    Returns relative paths to the processed outputs.
+    Accepts an uploaded audio file and performs vocal removal.
     """
     try:
         file_path = os.path.join(HOME_DIR, audio_file.filename)
         with open(file_path, "wb") as f:
             f.write(await audio_file.read())
 
-        logger.info(f"Uploaded file saved at: {file_path}")
-        output_files = process_audio(file_path, task)
-        return {"message": "Audio processed successfully!", "output_files": output_files}
+        logger.info(f"File uploaded: {file_path}")
+        output_files = perform_vocal_removal(file_path)
+
+        return {
+            "message": "Vocal removal completed successfully!",
+            "output_files": output_files
+        }
 
     except Exception as e:
         logger.error(f"Error: {e}")
@@ -101,10 +71,9 @@ async def process_audio_endpoint(task: str = Form(...), audio_file: UploadFile =
 @app.get("/download/{full_path:path}")
 async def download_file(full_path: str):
     """
-    Downloads a processed file. Path must start with valid prefix.
+    Downloads a processed file from vocal_remover directory.
     """
-    valid_prefixes = ("vocal_remover", "basic_splits", "advance_splits")
-    if not full_path.startswith(valid_prefixes):
+    if not full_path.startswith("vocal_remover"):
         raise HTTPException(status_code=400, detail="Invalid file path")
 
     abs_path = os.path.join(HOME_DIR, full_path)
