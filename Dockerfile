@@ -7,6 +7,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Add after installing requirements
+RUN python3 -m spleeter separate -i spleeter/audio_example.mp3 -p spleeter:4stems -o output || true
+RUN rm -rf output
+
+RUN python3 -m spleeter separate -i spleeter/audio_example.mp3 -p spleeter:2stems -o output || true
+RUN rm -rf output
+
+
 COPY . .
 
 EXPOSE 8000
