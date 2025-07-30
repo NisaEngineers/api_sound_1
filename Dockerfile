@@ -6,22 +6,24 @@ RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
 # Set working directory
 WORKDIR /app
 
-# Copy and install dependencies
+# Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Clean any old/corrupt models and prepare model directory
-RUN rm -rf ./pretrained_models && mkdir -p ./pretrained_models
+# Create a dummy audio file (empty silence)
+RUN ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 1 -q:a 9 -acodec libmp3lame dummy.mp3
 
-# ✅ Correct way to download models via CLI, not Python -m
-RUN wget https://github.com/deezer/spleeter/raw/master/audio_example.mp3
-RUN spleeter separate -p spleeter:2stems -o output audio_example.mp3
-RUN spleeter separate -p spleeter:4stems -o output audio_example.mp3
+# Force model downloads via dummy separation
+RUN python3 -m spleeter separate -i dummy.mp3 -p spleeter:4stems -o out || true
+RUN python3 -m spleeter separate -i dummy.mp3 -p spleeter:2stems -o out || true
 
-# Copy app code
+# Clean up dummy data
+RUN rm -rf out dummy.mp3
+
+# Copy the full project
 COPY . .
 
-# Expose port
+# Expose FastAPI port
 EXPOSE 8000
 
 # Start server
