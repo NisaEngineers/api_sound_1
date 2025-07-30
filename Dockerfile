@@ -14,8 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN rm -rf ./pretrained_models && mkdir -p ./pretrained_models
 
 # ✅ Correct way to download models via CLI, not Python -m
-RUN spleeter download --model_name 4stems --output_dir ./pretrained_models
-RUN spleeter download --model_name 2stems --output_dir ./pretrained_models
+RUN wget https://github.com/deezer/spleeter/raw/master/audio_example.mp3
+RUN spleeter separate -p spleeter:2stems -o output audio_example.mp3
+RUN spleeter separate -p spleeter:4stems -o output audio_example.mp3
 
 # Copy app code
 COPY . .
