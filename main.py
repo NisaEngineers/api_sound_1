@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,7 +10,7 @@ import pathlib
 # FastAPI app
 app = FastAPI()
 
-# Enable CORS (allow all for development)
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,14 +25,13 @@ HOME_DIR = str(pathlib.Path(__file__).parent.resolve())
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Utility
-def ensure_directory_exists(directory: str):
-    os.makedirs(directory, exist_ok=True)
+# === Utility Functions ===
 
 def normalize_path(path: str) -> str:
     return path.replace("\\", "/")
 
 # === Embedded VocalRemover Class ===
+
 class VocalRemover:
     def __init__(self, input_path, task='spleeter:2stems'):
         self.input_path = input_path
@@ -46,43 +45,46 @@ class VocalRemover:
 
     def run(self):
         self.separate_audio()
-        print("Separation completed")
+        logger.info("Separation completed")
 
 # === API Endpoints ===
 
 @app.post("/process-audio/")
-async def process_audio(audio_file: UploadFile = File(...)):
+async def process_audio(background_tasks: BackgroundTasks, audio_file: UploadFile = File(...)):
     """
-    Accepts uploaded audio file and performs vocal removal.
+    Accepts uploaded audio file and performs vocal removal in the background.
     """
     try:
+        # Save uploaded file
         file_path = os.path.join(HOME_DIR, audio_file.filename)
         with open(file_path, "wb") as f:
             f.write(await audio_file.read())
 
         logger.info(f"Uploaded file saved at: {file_path}")
 
-        # Run embedded vocal remover
-        remover = VocalRemover(file_path)
-        remover.run()
+        # Start background task for vocal separation
+        background_tasks.add_task(VocalRemover(file_path).run)
 
+        # Build expected output paths
         file_basename = os.path.splitext(os.path.basename(file_path))[0]
+        output_dir = normalize_path(os.path.join("vocal_remover", file_basename))
+
         return {
-            "message": "Vocal removal completed successfully!",
-            "output_files": [
-                normalize_path(os.path.join("vocal_remover", file_basename, "vocals.wav")),
-                normalize_path(os.path.join("vocal_remover", file_basename, "accompaniment.wav"))
+            "message": "File uploaded successfully. Vocal separation is running in the background.",
+            "download_paths": [
+                os.path.join(output_dir, "vocals.wav"),
+                os.path.join(output_dir, "accompaniment.wav")
             ]
         }
 
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error processing audio: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/download/{full_path:path}")
 async def download_file(full_path: str):
     """
-    Download a file only if it resides in vocal_remover/ folder.
+    Allows downloading processed files only from vocal_remover directory.
     """
     if not full_path.startswith("vocal_remover"):
         raise HTTPException(status_code=400, detail="Invalid file path")
@@ -93,7 +95,11 @@ async def download_file(full_path: str):
     else:
         raise HTTPException(status_code=404, detail="File not found")
 
-# Uvicorn entrypoint
+@app.get("/ping")
+def ping():
+    return {"status": "alive"}
+
+# Entrypoint
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
