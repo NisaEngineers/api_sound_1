@@ -1,10 +1,6 @@
-spleeter==2.3.2
-tensorflow==2.15.0
-fastapi==0.116.1
-uvicorn==0.35.0
-python-multipart==0.0.20
-librosa==0.10.2
-numpy==1.23.5
-soundfile==0.12.1
-numba==0.56.4
-llvmlite==0.38.1
+spleeter==2.4.0
+fastapi
+uvicorn
+python-multipart
+numpy==1.26.4
+
