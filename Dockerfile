@@ -8,9 +8,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Add after installing requirements
+# Force model download (as dummy run)
 RUN python3 -m spleeter separate -i audio_example.mp3 -p spleeter:4stems -o output || true
-RUN rm -rf output
-
 RUN python3 -m spleeter separate -i audio_example.mp3 -p spleeter:2stems -o output || true
 RUN rm -rf output
 
