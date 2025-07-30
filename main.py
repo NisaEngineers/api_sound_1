@@ -142,7 +142,7 @@ def get_status(task_id: str):
     
     return status_info
 
-@app.get("/app/{full_path:path}")
+@app.get("app/{full_path:path}")
 async def download_file(full_path: str):
     """
     Serve files from the output/ directory with case insensitivity
