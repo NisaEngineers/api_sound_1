@@ -3,24 +3,20 @@ import uuid
 import shutil
 import logging
 import pathlib
-import json
-import tempfile
-from datetime import datetime
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+
 from spleeter.separator import Separator
 
 # Paths
 HOME_DIR = pathlib.Path(__file__).parent.resolve()
 OUTPUT_BASE = HOME_DIR / "output"
-AUDIO_OUTPUT_DIR = OUTPUT_BASE / "audio"
-TASK_STATUS_DIR = OUTPUT_BASE / "task_status"
 
-# Ensure directories exist
-os.makedirs(AUDIO_OUTPUT_DIR, exist_ok=True)
-os.makedirs(TASK_STATUS_DIR, exist_ok=True)
+# Ensure that the output directory exists before mounting
+os.makedirs(OUTPUT_BASE, exist_ok=True)
 
 # FastAPI app
 app = FastAPI()
@@ -36,7 +32,7 @@ app.add_middleware(
 # Mount static output directory at /app
 app.mount(
     "/app",
-    StaticFiles(directory=str(AUDIO_OUTPUT_DIR), html=False),
+    StaticFiles(directory=str(OUTPUT_BASE), html=False),
     name="output_files",
 )
 
@@ -44,66 +40,50 @@ app.mount(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# In-memory task status
+processing_status = {}
+
 def process_audio_background(file_path: str, task_id: str):
-    """Run Spleeter and organize outputs, then clean up"""
-    status_file = TASK_STATUS_DIR / f"{task_id}.json"
-    task_audio_dir = AUDIO_OUTPUT_DIR / task_id
-    
+    """Run Spleeter and organize outputs, then clean up the upload."""
     try:
-        # Create task output directory
-        os.makedirs(task_audio_dir, exist_ok=True)
-        
-        # Update status
-        with open(status_file, "r+") as f:
-            status_data = json.load(f)
-            status_data["status"] = "processing"
-            status_data["started_at"] = datetime.utcnow().isoformat()
-            f.seek(0)
-            json.dump(status_data, f)
-            f.truncate()
+        basename = pathlib.Path(file_path).stem
+        safe_basename = basename.lower()
+        out_dir = OUTPUT_BASE / safe_basename
 
         # Separate stems
         separator = Separator("spleeter:2stems")
-        separator.separate_to_file(
-            file_path,
-            str(task_audio_dir),
-            filename_format='{instrument}.wav'
-        )
+        separator.separate_to_file(file_path, str(OUTPUT_BASE))
 
-        # Final status update
-        with open(status_file, "r+") as f:
-            status_data = json.load(f)
-            status_data["status"] = "completed"
-            status_data["completed_at"] = datetime.utcnow().isoformat()
-            status_data["stems"] = {
-                "vocals": f"{task_id}/vocals.wav",
-                "accompaniment": f"{task_id}/accompaniment.wav"
-            }
-            f.seek(0)
-            json.dump(status_data, f)
-            f.truncate()
+        # After separation, Spleeter creates a folder named `basename`
+        orig_dir = OUTPUT_BASE / basename
+        if orig_dir.exists() and orig_dir != out_dir:
+            if out_dir.exists():
+                shutil.rmtree(out_dir)
+            orig_dir.rename(out_dir)
+            logger.info(f"Renamed {orig_dir} → {out_dir}")
 
+        # Mark complete
+        processing_status[task_id] = {
+            "status": "completed",
+            "safe_basename": safe_basename,
+            "downloads": {
+                "vocals": f"{safe_basename}/vocals.wav",
+                "accompaniment": f"{safe_basename}/accompaniment.wav",
+            },
+        }
         logger.info(f"Task {task_id} completed")
 
-    except Exception as e:
-        # Error handling
-        logger.exception(f"Background processing failed: {e}")
-        with open(status_file, "r+") as f:
-            status_data = json.load(f)
-            status_data["status"] = "error"
-            status_data["error"] = str(e)
-            status_data["completed_at"] = datetime.utcnow().isoformat()
-            f.seek(0)
-            json.dump(status_data, f)
-            f.truncate()
-    finally:
-        # Cleanup original upload
+        # Clean up original upload
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                logger.info(f"Removed upload: {file_path}")
+            os.remove(file_path)
+            logger.info(f"Removed upload: {file_path}")
         except Exception as e:
-            logger.error(f"Cleanup error: {e}")
+            logger.error(f"Cleanup error for {file_path}: {e}")
+
+    except Exception as e:
+        logger.exception(f"Background processing failed ({task_id}): {e}")
+        processing_status[task_id] = {"status": "error", "message": str(e)}
+
 
 @app.post("/process-audio/")
 async def process_audio(
@@ -111,100 +91,90 @@ async def process_audio(
     background_tasks: BackgroundTasks,
     audio_file: UploadFile = File(...),
 ):
-    """Process audio file and start background separation"""
+    """
+    Save the uploaded file, kick off Spleeter in the background,
+    and return task info with download URLs.
+    """
     try:
-        # Save uploaded file
-        file_ext = pathlib.Path(audio_file.filename).suffix
-        temp_file = tempfile.NamedTemporaryFile(
-            delete=False, 
-            suffix=file_ext,
-            dir=HOME_DIR
-        )
-        await audio_file.seek(0)
-        content = await audio_file.read()
-        temp_file.write(content)
-        temp_file.close()
-        
-        # Create task
+        # Save upload to disk
+        upload_path = HOME_DIR / audio_file.filename
+        with open(upload_path, "wb") as f:
+            f.write(await audio_file.read())
+        logger.info(f"Saved upload to {upload_path}")
+
+        # Initialize task
         task_id = str(uuid.uuid4())
-        status_data = {
-            "status": "pending",
-            "task_id": task_id,
-            "created_at": datetime.utcnow().isoformat(),
-            "filename": audio_file.filename
+        processing_status[task_id] = {"status": "processing"}
+
+        # Launch background processing
+        background_tasks.add_task(process_audio_background, str(upload_path), task_id)
+
+        # Build URLs (they'll be valid once processing completes)
+        status_url = request.url_for("get_status", task_id=task_id)
+        downloads = {
+            "vocals": request.url_for("output_files", path=f"{audio_file.filename.rsplit('.',1)[0].lower()}/vocals.wav"),
+            "accompaniment": request.url_for("output_files", path=f"{audio_file.filename.rsplit('.',1)[0].lower()}/accompaniment.wav"),
+            "all": request.url_for("download_all", task_id=task_id),
         }
-        
-        # Save initial status
-        status_file = TASK_STATUS_DIR / f"{task_id}.json"
-        with open(status_file, "w") as f:
-            json.dump(status_data, f)
 
-        # Start processing
-        background_tasks.add_task(
-            process_audio_background, 
-            temp_file.name, 
-            task_id
-        )
-
-        # Build response URLs
         return {
             "message": "Processing started",
             "task_id": task_id,
-            "status_url": str(request.url_for("get_status", task_id=task_id)),
-            "downloads": {
-                "vocals": str(request.url_for("output_files", path=f"{task_id}/vocals.wav")),
-                "accompaniment": str(request.url_for("output_files", path=f"{task_id}/accompaniment.wav")),
-                "all": str(request.url_for("download_all", task_id=task_id)),
-            }
+            "status_url": status_url,
+            "downloads": downloads,
         }
 
     except Exception as e:
-        logger.error(f"Processing error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.error(f"/process-audio error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/status/{task_id}")
 def get_status(task_id: str):
-    """Check processing status"""
-    status_file = TASK_STATUS_DIR / f"{task_id}.json"
-    if not status_file.exists():
-        raise HTTPException(404, "Task not found")
-    
-    with open(status_file, "r") as f:
-        return json.load(f)
+    """Check background-job status."""
+    info = processing_status.get(task_id)
+    if not info:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    return info
+
 
 @app.get("/download/{task_id}/all")
 def download_all(task_id: str):
-    """Download all stems as ZIP"""
-    status_file = TASK_STATUS_DIR / f"{task_id}.json"
-    if not status_file.exists():
-        raise HTTPException(404, "Task not found")
-    
-    with open(status_file, "r") as f:
-        status_data = json.load(f)
-    
-    if status_data["status"] != "completed":
-        raise HTTPException(400, "Processing not completed")
-    
-    # Create temp ZIP
-    task_dir = AUDIO_OUTPUT_DIR / task_id
-    zip_path = shutil.make_archive(
-        base_name=tempfile.mktemp(dir=HOME_DIR),
-        format="zip",
-        root_dir=task_dir
-    )
-    
-    # Stream ZIP response
+    """
+    Zip up both stems for a completed task and return a single download.
+    """
+    info = processing_status.get(task_id)
+    if not info:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
+    if info.get("status") != "completed":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Task not completed yet")
+
+    safe_basename = info["safe_basename"]
+    stem_dir = OUTPUT_BASE / safe_basename
+    if not stem_dir.exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Output files missing")
+
+    # Prepare zip archive
+    zip_path = OUTPUT_BASE / f"{safe_basename}_stems.zip"
+    # Remove old zip if exists
+    if zip_path.exists():
+        zip_path.unlink()
+    shutil.make_archive(str(zip_path.with_suffix('')), 'zip', stem_dir)
+
+    # Stream the zip file
     return FileResponse(
-        zip_path,
-        filename=f"{task_id}_stems.zip",
-        media_type="application/zip",
-        background=BackgroundTask(lambda: os.remove(zip_path))
+        path=str(zip_path),
+        filename=f"{safe_basename}_stems.zip",
+        media_type="application/zip"
     )
+
 
 @app.get("/ping")
 def ping():
     return {"status": "alive"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8001)
